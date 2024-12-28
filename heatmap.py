@@ -694,7 +694,7 @@ class ImageSeriesMaker():
         return matrix
 
 
-def _get_osm_image(bbox, zoom, osm_base, osm_path_template):
+def _get_osm_image(bbox, zoom, osm_base, osm_path_template, osm_tile_scale):
     # Just a wrapper for osm.create_osm_image to translate coordinate schemes
     try:
         from osmviz.manager import PILImageManager, OSMManager
@@ -704,7 +704,8 @@ def _get_osm_image(bbox, zoom, osm_base, osm_path_template):
         osm = OSMManager(
             image_manager=PILImageManager('RGB'),
             server=osm_base,
-            url=osm_base + osm_path_template)
+            url=osm_base + osm_path_template,
+            scale=osm_tile_scale)
         (c1, c2) = bbox.corners()
         image, bounds = osm.create_osm_image((c1.lat, c2.lat, c1.lon, c2.lon),
                                              zoom)
@@ -719,8 +720,8 @@ def _get_osm_image(bbox, zoom, osm_base, osm_path_template):
         sys.exit(1)
 
 
-def _scale_for_osm_zoom(zoom):
-    return 256 * pow(2, zoom) / 360.0
+def _scale_for_osm_zoom(zoom, tile_size):
+    return 256 * tile_size * pow(2, zoom) / 360.0
 
 
 def choose_osm_zoom(config, padding):
@@ -734,7 +735,7 @@ def choose_osm_zoom(config, padding):
         raise ValueError('For OSM, you must specify height, width, or zoom')
     crazy_zoom_level = 30
     proj = MercatorProjection()
-    scale = _scale_for_osm_zoom(crazy_zoom_level)
+    scale = _scale_for_osm_zoom(crazy_zoom_level, config.osm_tile_scale)
     proj.pixels_per_degree = scale
     bbox_crazy_xy = config.extent_in.map(proj.project)
     if config.width:
@@ -759,13 +760,13 @@ def choose_osm_zoom(config, padding):
 def get_osm_background(config, padding):
     zoom = choose_osm_zoom(config, padding)
     proj = MercatorProjection()
-    proj.pixels_per_degree = _scale_for_osm_zoom(zoom)
+    proj.pixels_per_degree = _scale_for_osm_zoom(zoom, config.osm_tile_scale)
     bbox_xy = config.extent_in.map(proj.project)
     # We're not checking that the padding fits within the specified size.
     bbox_xy.grow(padding)
     bbox_ll = bbox_xy.map(proj.inverse_project)
     image, img_bbox_ll = _get_osm_image(bbox_ll, zoom, config.osm_base,
-                                        config.osm_path_template)
+                                        config.osm_path_template, config.osm_tile_scale)
     img_bbox_xy = img_bbox_ll.map(proj.project)
 
     # TODO: this crops to our data extent, which means we're not making
@@ -982,6 +983,7 @@ class Configuration(object):
         'osm': 'True/False; see command line options',
         'osm_base': '',
         'osm_path_template': '',
+        'osm_tile_scale': '',
         'zoom': '',
 
         # These are for making an animation, ignored otherwise.
@@ -1133,6 +1135,9 @@ class Configuration(object):
             '--osm_path_template', metavar='TEMPLATE',
             default='/{z}/{x}/{y}.png',
             help='URL path template for map tiles; default %(default)s')
+        parser.add_argument(
+            '--osm_tile_scale', type=int, default=1,
+            help='Scale to use for high-resolution tiles. Standard tile size is 256 pixels, high-resolution tiles are scale times 256 pixels (e.g., 512 pixels when scale is 2). Default %(default)s (standard resolution)')
         parser.add_argument(
             '-z', '--zoom', type=int, default=0,
             help='Zoom level for OSM; 0 means autozoom.')
