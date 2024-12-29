@@ -38,6 +38,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+from geopy.distance import geodesic
 
 __version__ = '1.13'
 
@@ -826,7 +827,13 @@ class GPXFileReader(FileReader):
         for trkseg in track.segments():
             for i, p1 in enumerate(trkseg[:-1]):
                 p2 = trkseg[i + 1]
-                yield LineSegment(p1.coords, p2.coords)
+
+                # Yield LineSegment only if the distance is less than 100 meters
+                latlon1 = (p1.coords.lat, p1.coords.lon)
+                latlon2 = (p2.coords.lat, p2.coords.lon)
+                distance = geodesic(latlon1, latlon2).meters
+                if distance < 100:
+                    yield LineSegment(p1.coords, p2.coords)
 
 
 class PlainFileReader(FileReader):
