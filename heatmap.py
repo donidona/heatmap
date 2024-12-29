@@ -705,6 +705,7 @@ def _get_osm_image(bbox, zoom, osm_base, osm_path_template, osm_tile_scale):
             image_manager=PILImageManager('RGB'),
             server=osm_base,
             url=osm_base + osm_path_template,
+            cache="./OSM_cache",
             scale=osm_tile_scale)
         (c1, c2) = bbox.corners()
         image, bounds = osm.create_osm_image((c1.lat, c2.lat, c1.lon, c2.lon),
